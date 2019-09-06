@@ -4,8 +4,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/mholt/caddy"
-	"github.com/miquella/caddy-awses"
+	"github.com/caddyserver/caddy"
+	awses "github.com/miquella/caddy-awses"
 )
 
 type TestCase struct {
