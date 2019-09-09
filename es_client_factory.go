@@ -1,6 +1,7 @@
 package awses
 
 import (
+	"fmt"
 	"sync"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -32,6 +33,7 @@ func (f *ElasticsearchClientFactory) New(region string) *elasticsearchservice.El
 	}
 
 	if f.Role != "" {
+		fmt.Printf("Assuming config for region=%s, role=%s\n", region, f.Role)
 		config.Credentials = stscreds.NewCredentials(f.RootSession.Copy(&config), f.Role)
 	}
 

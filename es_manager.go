@@ -3,6 +3,7 @@ package awses
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -61,6 +62,7 @@ func (m *ElasticsearchManager) ListDomains(region string) ([]string, error) {
 func (m *ElasticsearchManager) NewProxy(region, domain string) (*httputil.ReverseProxy, error) {
 	// lookup the domain endpoint
 	client := m.ClientFactory.Get(region)
+	fmt.Printf("msg='Getting client', region=%s, domain=%s\n", region, domain)
 	output, err := client.DescribeElasticsearchDomain(&elasticsearchservice.DescribeElasticsearchDomainInput{DomainName: &domain})
 	if err != nil {
 		if awsErr, ok := err.(awserr.Error); ok {
