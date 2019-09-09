@@ -73,13 +73,23 @@ func (m *ElasticsearchManager) NewProxy(region, domain string) (*httputil.Revers
 			}
 		}
 		return nil, err
-	} else if output.DomainStatus == nil || output.DomainStatus.Endpoint == nil {
+	} else if output.DomainStatus == nil {
 		return nil, ErrDomainNotFound
 	}
 
+	endpointHost := ""
+	if output.DomainStatus.Endpoint != nil {
+		endpointHost = *output.DomainStatus.Endpoint
+	} else {
+		if output.DomainStatus.Endpoints != nil && output.DomainStatus.Endpoints["vpc"] != nil {
+			endpointHost = *output.DomainStatus.Endpoints["vpc"]
+		}
+	}
+	if endpointHost == "" {
+		return nil, ErrDomainNotFound
+	}
 	// construct the reverse proxy
 	signer := v4.NewSigner(client.Config.Credentials)
-	endpointHost := *output.DomainStatus.Endpoint
 
 	return &httputil.ReverseProxy{
 		Director: func(req *http.Request) {
