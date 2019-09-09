@@ -119,7 +119,10 @@ func (m *ElasticsearchManager) NewProxy(region, domain string) (*httputil.Revers
 			}
 
 			// Sign the request
-			signer.Sign(req, body, "es", region, time.Now().Add(-10*time.Second))
+			_, err := signer.Sign(req, body, "es", region, time.Now().Add(-10*time.Second))
+			if err != nil {
+				panic(err)
+			}
 		},
 	}, nil
 }
