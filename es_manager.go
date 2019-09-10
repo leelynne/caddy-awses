@@ -3,7 +3,6 @@ package awses
 import (
 	"bytes"
 	"errors"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -62,7 +61,6 @@ func (m *ElasticsearchManager) ListDomains(region string) ([]string, error) {
 func (m *ElasticsearchManager) NewProxy(region, domain string) (*httputil.ReverseProxy, error) {
 	// lookup the domain endpoint
 	client := m.ClientFactory.Get(region)
-	fmt.Printf("msg='Getting client', region=%s, domain=%s\n", region, domain)
 	output, err := client.DescribeElasticsearchDomain(&elasticsearchservice.DescribeElasticsearchDomainInput{DomainName: &domain})
 	if err != nil {
 		if awsErr, ok := err.(awserr.Error); ok {
@@ -90,7 +88,8 @@ func (m *ElasticsearchManager) NewProxy(region, domain string) (*httputil.Revers
 	}
 	// construct the reverse proxy
 	signer := v4.NewSigner(client.Config.Credentials)
-
+	signer.DisableRequestBodyOverwrite = true
+	//host, _ := os.Hostname()
 	return &httputil.ReverseProxy{
 		Director: func(req *http.Request) {
 			// Rewrite the request
@@ -98,12 +97,6 @@ func (m *ElasticsearchManager) NewProxy(region, domain string) (*httputil.Revers
 			req.Host = ""
 			req.URL.Scheme = "https"
 			req.URL.Host = endpointHost
-
-			// if the client hasn't set a User-Agent, don't allow it to be set to the default value
-			if _, ok := req.Header["User-Agent"]; !ok {
-				req.Header.Set("User-Agent", "")
-			}
-
 			// why does the signing fail when we have "Connection: keep-alive"??
 
 			// Read the body
@@ -119,15 +112,10 @@ func (m *ElasticsearchManager) NewProxy(region, domain string) (*httputil.Revers
 			}
 
 			// Sign the request
-			headersGen, err := signer.Sign(req, body, "es", region, time.Now().Add(-10*time.Second))
-			fmt.Printf("Headers - %+v\n", headersGen)
-			if err != nil {
-				panic(err)
-			}
+			signer.Sign(req, body, "es", region, time.Now().Add(-10*time.Second))
+
 		},
 		ModifyResponse: func(resp *http.Response) error {
-			fmt.Printf("Status=%s, StatusCode=%d\n", resp.Status, resp.StatusCode)
-			fmt.Printf("RespHeaders - %+v\n", resp.Header)
 			return nil
 		},
 	}, nil
