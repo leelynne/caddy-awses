@@ -105,7 +105,6 @@ func (m *ElasticsearchManager) NewProxy(region, domain string) (*httputil.Revers
 			}
 
 			// why does the signing fail when we have "Connection: keep-alive"??
-			req.Header.Set("Connection", "close")
 
 			// Read the body
 			var body io.ReadSeeker
@@ -125,6 +124,11 @@ func (m *ElasticsearchManager) NewProxy(region, domain string) (*httputil.Revers
 			if err != nil {
 				panic(err)
 			}
+		},
+		ModifyResponse: func(resp *http.Response) error {
+			fmt.Printf("Status=%s, StatusCode=%d\n", resp.Status, resp.StatusCode)
+			fmt.Printf("RespHeaders - %+v\n", resp.Header)
+			return nil
 		},
 	}, nil
 }
