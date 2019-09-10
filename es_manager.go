@@ -94,6 +94,7 @@ func (m *ElasticsearchManager) NewProxy(region, domain string) (*httputil.Revers
 	return &httputil.ReverseProxy{
 		Director: func(req *http.Request) {
 			// Rewrite the request
+			req.Header = http.Header{}
 			req.Host = ""
 			req.URL.Scheme = "https"
 			req.URL.Host = endpointHost
