@@ -119,7 +119,8 @@ func (m *ElasticsearchManager) NewProxy(region, domain string) (*httputil.Revers
 			}
 
 			// Sign the request
-			_, err := signer.Sign(req, body, "es", region, time.Now().Add(-10*time.Second))
+			headersGen, err := signer.Sign(req, body, "es", region, time.Now().Add(-10*time.Second))
+			fmt.Printf("Headers - %+v\n", headersGen)
 			if err != nil {
 				panic(err)
 			}
