@@ -4,7 +4,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/caddyserver/caddy/caddyhttp/httpserver"
 )
 
@@ -16,10 +15,9 @@ type Dispatcher struct {
 }
 
 func NewDispatcher(configs []*Config, next httpserver.Handler) *Dispatcher {
-	rootSession := session.New()
 	handlers := make(map[*Config]*Handler)
 	for _, config := range configs {
-		handlers[config] = NewHandler(config, rootSession)
+		handlers[config] = NewHandler(config)
 	}
 
 	return &Dispatcher{

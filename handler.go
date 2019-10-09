@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
-
-	"github.com/aws/aws-sdk-go/aws/session"
 )
 
 type Handler struct {
@@ -14,11 +12,10 @@ type Handler struct {
 	manager *ElasticsearchManager
 }
 
-func NewHandler(config *Config, rootSession *session.Session) *Handler {
+func NewHandler(config *Config) *Handler {
 	return &Handler{
-		Config: config,
-
-		manager: NewElasticsearchManager(rootSession, config.Role),
+		Config:  config,
+		manager: NewElasticsearchManager(config.Role),
 	}
 }
 

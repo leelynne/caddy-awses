@@ -3,6 +3,7 @@ package awses
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -12,7 +13,6 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws/awserr"
-	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/aws/signer/v4"
 	"github.com/aws/aws-sdk-go/service/elasticsearchservice"
 )
@@ -34,7 +34,7 @@ type ElasticsearchManager struct {
 	proxies map[elasticsearchDomain]*httputil.ReverseProxy
 }
 
-func NewElasticsearchManager(rootSession *session.Session, role string) *ElasticsearchManager {
+func NewElasticsearchManager(role string) *ElasticsearchManager {
 	return &ElasticsearchManager{
 		ClientFactory: ElasticsearchClientFactory{
 			Role: role,
@@ -62,6 +62,7 @@ func (m *ElasticsearchManager) NewProxy(region, domain string) (*httputil.Revers
 	client := m.ClientFactory.Get(region)
 	output, err := client.DescribeElasticsearchDomain(&elasticsearchservice.DescribeElasticsearchDomainInput{DomainName: &domain})
 	if err != nil {
+		fmt.Printf("Error describing domain '%s'\n", err.Error())
 		if awsErr, ok := err.(awserr.Error); ok {
 			if awsErr.Code() == "ResourceNotFoundException" {
 				return nil, ErrDomainNotFound
@@ -87,21 +88,26 @@ func (m *ElasticsearchManager) NewProxy(region, domain string) (*httputil.Revers
 	}
 	// construct the reverse proxy
 	signer := v4.NewSigner(client.Config.Credentials)
-	signer.DisableRequestBodyOverwrite = true
+	//signer.DisableRequestBodyOverwrite = true
 	//host, _ := os.Hostname()
 	return &httputil.ReverseProxy{
 		Director: func(req *http.Request) {
 			// Rewrite the request
-			req.Header = http.Header{}
+			req.Header.Del("x-forwarded-for")
+			req.Header.Del("x-forwarded-port")
+			req.Header.Del("x-forwarded-proto")
+			req.Header.Del("x-amzn-oidc-identity")
+			req.Header.Del("x-amzn-oidc-data")
+			req.Header.Del("x-amzn-oidc-accesstoken")
+
 			req.Host = ""
 			req.URL.Scheme = "https"
 			req.URL.Host = endpointHost
 			// why does the signing fail when we have "Connection: keep-alive"??
-
+			req.Header.Set("Connection", "close")
 			// Read the body
 			var body io.ReadSeeker
 			if req.Body != nil {
-				defer req.Body.Close()
 				bodyBytes, err := ioutil.ReadAll(req.Body)
 				if err != nil {
 					return
@@ -112,9 +118,11 @@ func (m *ElasticsearchManager) NewProxy(region, domain string) (*httputil.Revers
 
 			// Sign the request
 			signer.Sign(req, body, "es", region, time.Now().Add(-10*time.Second))
+			fmt.Printf("\nOutgoing REQUEST: %+v\n", req)
 
 		},
 		ModifyResponse: func(resp *http.Response) error {
+			fmt.Printf("REPSONSE %+v\n", resp)
 			return nil
 		},
 	}, nil
