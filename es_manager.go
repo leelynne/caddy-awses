@@ -118,11 +118,9 @@ func (m *ElasticsearchManager) NewProxy(region, domain string) (*httputil.Revers
 
 			// Sign the request
 			signer.Sign(req, body, "es", region, time.Now().Add(-10*time.Second))
-			fmt.Printf("\nOutgoing REQUEST: %+v\n", req)
 
 		},
 		ModifyResponse: func(resp *http.Response) error {
-			fmt.Printf("REPSONSE %+v\n", resp)
 			return nil
 		},
 	}, nil

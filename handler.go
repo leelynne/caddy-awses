@@ -82,7 +82,7 @@ func (h *Handler) proxyRequest(w http.ResponseWriter, r *http.Request, region, d
 	}
 
 	r.URL.Path = path
-	fmt.Printf("PROXY REQUEST for %+v\n", r)
+
 	reverseProxy.ServeHTTP(w, r)
 	return 0, nil
 }
