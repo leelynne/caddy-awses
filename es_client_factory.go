@@ -9,41 +9,50 @@ import (
 	"github.com/aws/aws-sdk-go/service/elasticsearchservice"
 )
 
-// An Elasticsearch client factory with a cache that allows concurrent cached client sharing
-type ElasticsearchClientFactory struct {
-	RootSession *session.Session
-	Role        string
-
-	mutex   sync.RWMutex
-	clients map[string]*elasticsearchservice.ElasticsearchService
+type awsregion string
+type sessionCache struct {
+	sess *session.Session
+	conf *aws.Config
 }
 
-func NewElasticsearchClientFactory(rootSession *session.Session, role string) *ElasticsearchClientFactory {
+// An Elasticsearch client factory with a cache that allows concurrent cached client sharing
+type ElasticsearchClientFactory struct {
+	Role string
+
+	mutex   sync.RWMutex
+	clients map[awsregion]sessionCache
+}
+
+func NewElasticsearchClientFactory(role string) *ElasticsearchClientFactory {
 	return &ElasticsearchClientFactory{
-		RootSession: rootSession,
-		Role:        role,
+		Role: role,
 	}
 }
 
 // Returns a new client (does not lock or use the cache)
-func (f *ElasticsearchClientFactory) New(region string) *elasticsearchservice.ElasticsearchService {
-	config := aws.Config{
+func (f *ElasticsearchClientFactory) New(region string) sessionCache {
+	config := &aws.Config{
 		Region: &region,
 	}
 
+	sess := session.Must(session.NewSession(config))
+
 	if f.Role != "" {
-		config.Credentials = stscreds.NewCredentials(f.RootSession.Copy(&config), f.Role)
+		config.Credentials = stscreds.NewCredentials(sess, f.Role)
 	}
 
-	return elasticsearchservice.New(f.RootSession.Copy(&config))
+	return sessionCache{
+		sess: sess,
+		conf: config,
+	}
 }
 
 // Returns a cached client or instantiates a new client and caches it
 func (f *ElasticsearchClientFactory) Get(region string) *elasticsearchservice.ElasticsearchService {
 	// read lock to check client cache
-	client := f.cached(region)
-	if client != nil {
-		return client
+	client, found := f.cached(region)
+	if found {
+		return elasticsearchservice.New(client.sess, client.conf)
 	}
 
 	// write lock to construct a new client (if necessary)
@@ -51,24 +60,26 @@ func (f *ElasticsearchClientFactory) Get(region string) *elasticsearchservice.El
 	defer f.mutex.Unlock()
 
 	if f.clients == nil {
-		f.clients = make(map[string]*elasticsearchservice.ElasticsearchService)
+		f.clients = map[awsregion]sessionCache{}
 	}
 
-	if client = f.clients[region]; client == nil {
-		client = f.New(region)
-	}
-
-	f.clients[region] = client
-	return client
+	client = f.New(region)
+	f.clients[awsregion(region)] = client
+	return elasticsearchservice.New(client.sess, client.conf)
 }
 
-func (f *ElasticsearchClientFactory) cached(region string) *elasticsearchservice.ElasticsearchService {
+func (f *ElasticsearchClientFactory) cached(region string) (sc sessionCache, found bool) {
 	f.mutex.RLock()
 	defer f.mutex.RUnlock()
 
 	if f.clients == nil {
-		return nil
+		return sessionCache{}, false
 	}
 
-	return f.clients[region]
+	sc = f.clients[awsregion(region)]
+	if sc.conf != nil && sc.conf.Credentials != nil && sc.conf.Credentials.IsExpired() {
+		delete(f.clients, awsregion(region))
+		return sessionCache{}, false
+	}
+	return sc, true
 }

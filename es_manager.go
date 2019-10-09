@@ -37,8 +37,7 @@ type ElasticsearchManager struct {
 func NewElasticsearchManager(rootSession *session.Session, role string) *ElasticsearchManager {
 	return &ElasticsearchManager{
 		ClientFactory: ElasticsearchClientFactory{
-			RootSession: rootSession,
-			Role:        role,
+			Role: role,
 		},
 	}
 }
